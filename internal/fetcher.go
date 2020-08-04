@@ -166,13 +166,18 @@ func (f *Fetcher) RecordWorkflowJobMetrics(slug ProjectSlug) (ok bool) {
 
 	var pageToken string
 	var err error
+WORKFLOWS:
 	for w, jobs := range f.workflowJobs {
-		// TODO: fix iteration here.
-		pageToken, err = f.recordWorkflow(slug, w, pageToken)
-		if err != nil {
-			f.logger.Printf("Fetcher.RecordWorkflowJobMetrics: failed to record workflow %q: %v", w, err)
-			ok = false
-			continue // To next workflow.
+		for {
+			pageToken, err = f.recordWorkflow(slug, w, pageToken)
+			if err != nil {
+				f.logger.Printf("Fetcher.RecordWorkflowJobMetrics: failed to record workflow %q: %v", w, err)
+				ok = false
+				continue WORKFLOWS
+			}
+			if pageToken == "" {
+				break // Begin processing jobs.
+			}
 		}
 
 		for _, j := range jobs {
