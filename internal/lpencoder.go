@@ -13,13 +13,15 @@ import (
 
 // Special tag value to use when no branch filter was applied.
 // This was chosen because branch names are not allowed to start with / in git.
-const AllBranches = "/all"
+const AllBranches = "/all" // TODO: change to AnyBranch.
 
+// LineProtocolEncoder formats domain-specific metrics to line protocol.
 type LineProtocolEncoder struct {
 	enc    *protocol.Encoder
 	logger *log.Logger
 }
 
+// NewLineProtocolEncoder returns a new LineProtocolEncoder.
 func NewLineProtocolEncoder(logger *log.Logger, out io.Writer) *LineProtocolEncoder {
 	enc := protocol.NewEncoder(out)
 	enc.SetFieldSortOrder(protocol.SortFields) // Easier for humans to read the output this way.
@@ -54,6 +56,7 @@ type WorkflowItem struct {
 	CreditsUsed     int    `json:"credits_used"`
 }
 
+// Fields returns the line protocol fields corresponding to i.
 func (i WorkflowItem) Fields() map[string]interface{} {
 	return map[string]interface{}{
 		"id":               i.ID,
@@ -72,6 +75,7 @@ type JobItem struct {
 	CreditsUsed     int    `json:"credits_used"`
 }
 
+// Fields returns the line protocol fields corresponding to i.
 func (i JobItem) Fields() map[string]interface{} {
 	return map[string]interface{}{
 		"id":               i.ID,
@@ -81,6 +85,8 @@ func (i JobItem) Fields() map[string]interface{} {
 	}
 }
 
+// TooOldError is returned when iterating through a slice of WorkItems or JobItems
+// and an item older than the Fetcher's Lookback is encountered.
 type TooOldError struct {
 	Time time.Time
 }
@@ -91,6 +97,7 @@ func (e TooOldError) Error() string {
 	return fmt.Sprintf("entry with time %s is older than allowed", e.Time.UTC().Format(time.RFC3339))
 }
 
+// WorkflowItem encodes the given WorkflowItem to line protocol.
 func (e *LineProtocolEncoder) WorkflowItem(p WorkflowJobPath, i WorkflowItem, oldestAllowed time.Time) error {
 	ts, err := time.Parse(time.RFC3339, i.CreatedAt)
 	if err != nil {
@@ -128,6 +135,7 @@ func (e *LineProtocolEncoder) WorkflowItem(p WorkflowJobPath, i WorkflowItem, ol
 	return nil
 }
 
+// JobItem encodes the given JobItem to line protocol.
 func (e *LineProtocolEncoder) JobItem(p WorkflowJobPath, i JobItem, oldestAllowed time.Time) error {
 	ts, err := time.Parse(time.RFC3339, i.StartedAt)
 	if err != nil {
@@ -167,6 +175,7 @@ func (e *LineProtocolEncoder) JobItem(p WorkflowJobPath, i JobItem, oldestAllowe
 	return nil
 }
 
+// FetcherRequest records internal metrics for an HTTP request that the Fetcher made.
 func (e *LineProtocolEncoder) FetcherRequest(d time.Duration, typ string, resp *http.Response) {
 	ts := time.Now()
 

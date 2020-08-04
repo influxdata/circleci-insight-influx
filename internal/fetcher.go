@@ -12,6 +12,7 @@ import (
 
 const defaultHost = "https://circleci.com"
 
+// Fetcher interacts with the CircleCI API to retrieve metric details about Workflows and Jobs.
 type Fetcher struct {
 	token         string
 	branch        string
@@ -27,8 +28,10 @@ type Fetcher struct {
 	workflowJobs map[string][]string
 }
 
+// FetcherOption modifies a Fetcher returned by NewFetcher.
 type FetcherOption func(*Fetcher) error
 
+// NewFetcher returns an initialized Fetcher.
 func NewFetcher(logger *log.Logger, token string, enc *LineProtocolEncoder, opts ...FetcherOption) (*Fetcher, error) {
 	f := &Fetcher{
 		token:    token,
@@ -49,11 +52,8 @@ func NewFetcher(logger *log.Logger, token string, enc *LineProtocolEncoder, opts
 }
 
 // Discover uses the CircleCI insights API to discover the workflows and jobs within a project.
-// projectSlug is expected to be a CircleCI project slug, which doesn't seem to be documented,
-// but typically it is "gh/<owner>/<repo>".
+// Typically, a caller will call RecordWorkflowJobMetrics after Discover.
 func (f *Fetcher) Discover(slug ProjectSlug) error {
-	// TODO: coerce gh/ at beginning of slug if not formed correctly.
-
 	f.workflowJobs = make(map[string][]string)
 
 	var pageToken string
@@ -159,12 +159,15 @@ func (f *Fetcher) discoverJobs(slug ProjectSlug, workflowName, pageToken string)
 	return jobsResponse.NextPageToken, nil
 }
 
+// RecordWorkflowJobMetrics retrieves run details for workflows and jobs in the given project.
+// It returns true if there were no errors; otherwise, errors are logged and a best effort is made to continue.
 func (f *Fetcher) RecordWorkflowJobMetrics(slug ProjectSlug) (ok bool) {
 	ok = true
 
 	var pageToken string
 	var err error
 	for w, jobs := range f.workflowJobs {
+		// TODO: fix iteration here.
 		pageToken, err = f.recordWorkflow(slug, w, pageToken)
 		if err != nil {
 			f.logger.Printf("Fetcher.RecordWorkflowJobMetrics: failed to record workflow %q: %v", w, err)
@@ -297,16 +300,7 @@ func (f *Fetcher) recordJob(slug ProjectSlug, w, j, pageToken string) (string, e
 	return jobsResponse.NextPageToken, nil
 }
 
-// TODO: remove
-func (f *Fetcher) DumpWorkflowJobs() {
-	for w, js := range f.workflowJobs {
-		fmt.Println(w)
-		for _, j := range js {
-			fmt.Println("\t", j)
-		}
-	}
-}
-
+// paginatedNamedItemResponse is used when discovering Workflows and Jobs.
 type paginatedNamedItemResponse struct {
 	NextPageToken string `json:"next_page_token"`
 	Items         []struct {
@@ -337,6 +331,8 @@ func (f *Fetcher) request(path string) (*http.Request, error) {
 	return req, nil
 }
 
+// WithHost sets the host for the Fetcher.
+// If not provided, defaults to https://circleci.com.
 func WithHost(hostname string) FetcherOption {
 	return func(f *Fetcher) error {
 		f.hostname = hostname
@@ -344,6 +340,8 @@ func WithHost(hostname string) FetcherOption {
 	}
 }
 
+// WithBranch sets which branch to specify when scraping.
+// If not set, then will scrape metrics for all aggregated branches.
 func WithBranch(branch string) FetcherOption {
 	return func(f *Fetcher) error {
 		f.branch = branch
@@ -351,6 +349,7 @@ func WithBranch(branch string) FetcherOption {
 	}
 }
 
+// WithLookback sets the limit on how old of metrics to report.
 func WithLookback(lookback time.Duration) FetcherOption {
 	oldest := time.Now().Add(-lookback)
 	return func(f *Fetcher) error {
@@ -359,10 +358,14 @@ func WithLookback(lookback time.Duration) FetcherOption {
 	}
 }
 
+// ProjectSlug is the CircleCI representation of a project.
 type ProjectSlug struct {
 	VCS, Owner, Repo string
 }
 
+// ProjectSlugFromString parses a stringified project slug into a ProjectSlug.
+// Valid formats are "vcs/owner/repo", and "owner/repo",
+// the latter of which implies vcs of "github".
 func ProjectSlugFromString(s string) (ProjectSlug, error) {
 	parts := strings.Split(s, "/")
 
@@ -382,6 +385,7 @@ func ProjectSlugFromString(s string) (ProjectSlug, error) {
 	return ps, nil
 }
 
+// String returns a stringified version of s.
 func (s ProjectSlug) String() string {
 	return s.VCS + "/" + s.Owner + "/" + s.Repo
 }
