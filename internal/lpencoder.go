@@ -13,7 +13,7 @@ import (
 
 // Special tag value to use when no branch filter was applied.
 // This was chosen because branch names are not allowed to start with / in git.
-const AllBranches = "/all" // TODO: change to AnyBranch.
+const AnyBranch = "/any"
 
 // LineProtocolEncoder formats domain-specific metrics to line protocol.
 type LineProtocolEncoder struct {
@@ -110,7 +110,7 @@ func (e *LineProtocolEncoder) WorkflowItem(p WorkflowJobPath, i WorkflowItem, ol
 
 	branch := p.Branch
 	if branch == "" {
-		branch = AllBranches
+		branch = AnyBranch
 	}
 
 	m, err := protocol.New(
@@ -148,7 +148,7 @@ func (e *LineProtocolEncoder) JobItem(p WorkflowJobPath, i JobItem, oldestAllowe
 
 	branch := p.Branch
 	if branch == "" {
-		branch = AllBranches
+		branch = AnyBranch
 	}
 
 	m, err := protocol.New(
